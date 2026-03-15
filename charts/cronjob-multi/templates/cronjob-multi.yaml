@@ -1,0 +1,298 @@
+################################################
+# Standardized Templates - Cronjob Multi
+# Author/Maintainer: Farley <farley@neonsurge.com>
+################################################
+{{- $toplevel := . }}
+{{- range $job := .Values.cronjobs }}
+
+apiVersion: {{ template "cronjob.apiVersion" $toplevel }}
+kind: CronJob
+metadata:
+  name: {{ $job.name | quote }}
+  labels:
+    app: {{ template "name" $toplevel }}
+    cronjob-app: {{ $job.name | quote }}
+{{ include "labels_without_key_or_name" $toplevel | indent 4 }}
+spec:
+  schedule: {{ if $job.schedule }}{{ $job.schedule | quote }}{{ else }}{{ required "Please specify cronjob schedule, eg 0 0 * * * for once-per-day." $toplevel.Values.schedule | quote }}{{ end }}
+  concurrencyPolicy: {{ default "Forbid" $toplevel.Values.concurrencyPolicy | quote }}
+  successfulJobsHistoryLimit: {{ default 1 $toplevel.Values.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ default 3 $toplevel.Values.failedJobsHistoryLimit }}
+  startingDeadlineSeconds: {{ default 600 $toplevel.Values.startingDeadlineSeconds }}
+  {{- if $toplevel.Values.suspend }}
+  suspend: {{ $toplevel.Values.suspend }}
+  {{- end }}
+  jobTemplate:
+    metadata:
+      name: {{ $job.name | quote }}
+      labels:
+        app: {{ template "name" $toplevel }}
+        cronjob-app: {{ $job.name | quote }}
+{{- include "labels_without_key_or_name" $toplevel | indent 8 }}
+    spec:
+      backoffLimit: {{ default 0 $toplevel.Values.backoffLimit }}
+      parallelism: {{ default 1 $toplevel.Values.parallelism }}
+      completions: {{ default 1 $toplevel.Values.completions }}
+      template:
+        metadata:
+          name: {{ $job.name | quote }}
+          labels:
+            app: {{ template "name" $toplevel }}
+            cronjob-app: {{ $job.name | quote }}
+{{- include "labels_without_key_or_name" $toplevel | indent 12 }}
+{{- if $toplevel.Values.podAnnotations }}
+          annotations:
+{{- range $k, $v := $toplevel.Values.podAnnotations }}
+            {{ $k }}:  {{ with $v }}{{ tpl . $toplevel | quote }}{{- end }}
+{{- end }}
+{{- end }}
+        spec:
+
+{{- if $toplevel.Values.shareProcessNamespace }}
+{{- if (eq $toplevel.Values.shareProcessNamespace true) }}
+          shareProcessNamespace: true
+{{- end }}
+{{- end }}
+
+          # If we have a priority class set, set it here
+{{- if $toplevel.Values.priorityClassName }}
+          priorityClassName: "{{ $toplevel.Values.priorityClassName }}"
+{{- end }}
+          restartPolicy: {{ default "Never" $toplevel.Values.restartPolicy }}
+          # If we have a hostname set, set it here
+          {{- if $toplevel.Values.hostname }}
+          hostname: {{ with $toplevel.Values.hostname }}{{ tpl . $ | quote }}{{- end }}
+          {{- end }}
+
+        # To have features such as run as non root
+        {{- if $job.podSecurityContext }}
+          securityContext:
+{{ toYaml $job.podSecurityContext | indent 12 }}
+        {{- else if $toplevel.Values.podSecurityContext }}
+          securityContext:
+{{ toYaml $toplevel.Values.podSecurityContext | indent 12 }}
+        {{- else if (eq $toplevel.Values.security.runAsNonRoot true) }}
+          securityContext:
+{{ toYaml $toplevel.Values.security | indent 12 }}
+        {{- end }}
+
+        {{- with $toplevel.Values.nodeSelector }}
+          nodeSelector:
+{{ toYaml . | indent 12 }}
+        {{- end }}
+
+        # Tolerations is another form of affinity/anti-affinity that is dynamic, nodes
+        # can be assigned tolerations which can affect pods
+        {{- with $toplevel.Values.tolerations }}
+          tolerations:
+{{ toYaml . | indent 12 }}
+        {{- end }}
+
+      # If we have any init containers
+          {{- with $toplevel.Values.initContainers }}
+          initContainers:
+{{ toYaml . | indent 12 }}
+          {{- end }}
+
+          containers:
+{{with $toplevel.Values.extraContainers }}
+# This is for definining extraContainers (sidecars)
+{{ toYaml . | indent 12}}
+{{- end }}
+
+            # The primary container for our service
+            - name: {{ $job.name | quote }}
+              image: "{{ template "get-repository" $toplevel }}:{{ template "get-release-tag" $toplevel }}"
+
+{{- if $job.command }}
+              command: {{- range $job.command }}
+                - {{ . | quote }}
+              {{- end }}
+{{- else if $toplevel.Values.image.command }}
+              command: {{- range $toplevel.Values.image.command }}
+                - {{ . | quote }}
+              {{- end }}
+{{- end }}
+
+{{- if $job.args }}
+              args: {{- range $job.args }}
+                - {{ . | quote }}
+              {{- end }}
+{{- else if $toplevel.Values.image.args }}
+              args: {{- range $toplevel.Values.image.args }}
+                - {{ . | quote }}
+              {{- end }}
+{{- end }}
+
+{{- if $toplevel.Values.image.imagePullPolicy }}
+              imagePullPolicy: {{ $toplevel.Values.image.imagePullPolicy }}
+{{- end }}
+
+{{- if $job.containerSecurityContext }}
+              securityContext:
+{{ toYaml $job.containerSecurityContext | indent 16 }}
+{{- else if $toplevel.Values.containerSecurityContext }}
+              securityContext:
+{{ toYaml $toplevel.Values.containerSecurityContext | indent 16 }}
+{{- end }}
+
+              env:
+                # Default env variables we want all containers to have
+                - name: "POD_NAME"
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: "POD_NAMESPACE"
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: POD_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.podIP
+                - name: "NAMESPACE"
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: NODE_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: spec.nodeName
+                - name: NODE_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.hostIP
+                - name: HOST_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.hostIP
+                - name: POD_SERVICE_ACCOUNT
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: spec.serviceAccountName
+                - name: CONTAINER_CPU_REQUESTS_MILLICORES
+                  valueFrom:
+                    resourceFieldRef:
+                      resource: requests.cpu
+                      divisor: 1m
+                - name: CONTAINER_CPU_LIMITS_MILLICORES
+                  valueFrom:
+                    resourceFieldRef:
+                      resource: limits.cpu
+                      divisor: 1m
+{{- if $toplevel.Values.usingMemoryKibiBytesEnvs }}
+                - name: CONTAINER_MEMORY_REQUESTS_KIBIBYTES
+                  valueFrom:
+                    resourceFieldRef:
+                      resource: requests.memory
+                      divisor: 1Ki
+                - name: CONTAINER_MEMORY_LIMITS_KIBIBYTES
+                  valueFrom:
+                    resourceFieldRef:
+                      resource: limits.memory
+                      divisor: 1Ki
+{{- else }}
+                - name: CONTAINER_MEMORY_REQUESTS_MEGABYTES
+                  valueFrom:
+                    resourceFieldRef:
+                      resource: requests.memory
+                      divisor: 1Mi
+                - name: CONTAINER_MEMORY_LIMITS_MEGABYTES
+                  valueFrom:
+                    resourceFieldRef:
+                      resource: limits.memory
+                      divisor: 1Mi
+{{- end }}
+
+                # Global variables placed in a "global" values file for all environments
+                {{- if $toplevel.Values.globalEnvs }}
+                # Insert globals here, special handling so we can "tpl" these values and use eg: namespace in them
+                {{- range $toplevel.Values.globalEnvs }}
+                - name: {{ .name | quote }}
+                  {{- if .value }}
+                  value: {{ with .value }}{{ tpl . $ | quote }}{{- end }}
+                  {{- end }}
+                  {{- if .valueFrom }}
+                  valueFrom:
+{{ .valueFrom | toYaml | indent 20 }}
+                  {{- end }}
+                {{- end }}
+                {{- end }}
+
+                # Secondary environment variables (for globals, all deployments, to help with multi-inheritance)
+                {{- if $toplevel.Values.globalEnvsSecondary }}
+                # Insert globals here, special handling so we can "tpl" these values and use eg: namespace in them
+                {{- range $toplevel.Values.globalEnvsSecondary }}
+                - name: {{ .name | quote }}
+                  {{- if .value }}
+                  value: {{ with .value }}{{ tpl . $ | quote }}{{- end }}
+                  {{- end }}
+                  {{- if .valueFrom }}
+                  valueFrom:
+{{ .valueFrom | toYaml | indent 20 }}
+                  {{- end }}
+                {{- end }}
+                {{- end }}
+
+                # Insert extra envs here, for sub-values files inserts, with special handling so we can "tpl" in them
+                {{- if $toplevel.Values.extraEnvs }}
+                {{- range $toplevel.Values.extraEnvs }}
+                - name: {{ .name | quote }}
+                  {{- if .value }}
+                  value: {{ with .value }}{{ tpl . $ | quote }}{{- end }}
+                  {{- end }}
+                  {{- if .valueFrom }}
+                  valueFrom:
+{{ .valueFrom | toYaml | indent 20 }}
+                  {{- end }}
+                {{- end }}
+                {{- end }}
+
+# If we want to pull env variables from other confimgaps or secrets
+              envFrom:
+                {{- with $toplevel.Values.envFrom }}
+{{ toYaml . | indent 16 }}
+                {{- end }}
+
+# This defines our resource limits
+              resources:
+{{ toYaml $toplevel.Values.resources | indent 16 }}
+
+# This defines any volume mounts we might want, only occurs if set
+              volumeMounts:
+{{- if $toplevel.Values.volumeMounts }}
+{{- with $toplevel.Values.volumeMounts }}
+{{ toYaml . | indent 16 }}
+{{- end -}}
+{{- end }}
+
+
+# TODO: NEED TO TEST ALL ITEMS BELOW THIS, UNTESTED!!!
+
+# Modify /etc/resolv.conf ndots
+{{- if $toplevel.Values.dnsConfig.enabled }}
+          dnsConfig:
+            options:
+              - name: ndots
+                value: {{ $toplevel.Values.dnsConfig.ndots | quote}}
+{{- end }}
+
+# This is our volume definitions, if we have volume mounts
+{{- with $toplevel.Values.volumes }}
+          volumes:
+{{ toYaml . | indent 12 }}
+{{- end }}
+
+# This is our image pull secret references, if we have image pull secrets
+{{- with $toplevel.Values.image.imagePullSecrets }}
+          imagePullSecrets:
+{{ toYaml . | indent 12 }}
+{{- end }}
+
+# Service Account creation
+{{- if or (eq $toplevel.Values.serviceAccount.enabled true) (eq $toplevel.Values.rbac.create true) }}
+          serviceAccountName: {{ template "name" $toplevel }}
+{{- end }}
+---
+{{- end }}
+
