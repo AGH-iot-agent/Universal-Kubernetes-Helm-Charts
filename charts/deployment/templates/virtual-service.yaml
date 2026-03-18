@@ -1,6 +1,12 @@
 {{- if .Values.istio.virtualService.enabled -}}
 {{- $fullName := include "name" . -}}
 {{- $hosts := required "A valid Values.istio.virtualService.hosts is required!" .Values.istio.virtualService.hosts -}}
+{{- $gatewayNamespace := default "istio-system" .Values.istio.gateway.namespace -}}
+{{- $gatewayName := default "istio-ingressgateway" .Values.istio.gateway.name -}}
+{{- $gatewayFqdn := printf "%s/%s" $gatewayNamespace $gatewayName -}}
+{{- $gatewayExternalV1 := lookup "networking.istio.io/v1" "Gateway" $gatewayNamespace $gatewayName -}}
+{{- $gatewayExternalV1beta1 := lookup "networking.istio.io/v1beta1" "Gateway" $gatewayNamespace $gatewayName -}}
+{{- $gatewayExists := or $gatewayExternalV1 $gatewayExternalV1beta1 -}}
 ################################################
 # Standardized Templates - Istio VirtualService
 ################################################
@@ -19,8 +25,16 @@ spec:
     - {{ tpl . $ | quote }}
 {{- end }}
   gateways:
+{{- if .Values.istio.virtualService.gateways }}
 {{- range .Values.istio.virtualService.gateways }}
     - {{ tpl . $ | quote }}
+{{- end }}
+{{- else if $gatewayExists }}
+    - {{ $gatewayFqdn | quote }}
+{{- else if .Values.istio.gateway.createIfMissing }}
+    - {{ $gatewayFqdn | quote }}
+{{- else }}
+    - mesh
 {{- end }}
   http:
 {{- if .Values.istio.virtualService.http }}

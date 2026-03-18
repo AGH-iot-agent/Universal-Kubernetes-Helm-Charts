@@ -113,6 +113,19 @@ ingress_secondary:
 
 # Istio VirtualService definitions
 istio:
+  gateway:
+    # If true, chart will create a Gateway in case istio-system/istio-ingressgateway does not exist
+    createIfMissing: false
+    # Target namespace/name for externally managed ingress gateway resource
+    namespace: istio-system
+    name: istio-ingressgateway
+    # Selector used only when creating gateway (must match Istio ingress gateway pods)
+    selector:
+      istio: ingressgateway
+    # Server defaults for created gateway
+    port: 80
+    protocol: HTTP
+    
   virtualService:
     enabled: false
     # If we want to override the name, RECOMMEND YOU DO NOT DO THIS UNLESS YOU NEED, it has a sane default

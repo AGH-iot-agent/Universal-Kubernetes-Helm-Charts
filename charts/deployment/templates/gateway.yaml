@@ -1,0 +1,33 @@
+{{- if .Values.istio.virtualService.enabled -}}
+{{- if .Values.istio.gateway.createIfMissing -}}
+{{- $hosts := required "A valid Values.istio.virtualService.hosts is required!" .Values.istio.virtualService.hosts -}}
+{{- $gatewayNamespace := default "istio-system" .Values.istio.gateway.namespace -}}
+{{- $gatewayName := default "istio-ingressgateway" .Values.istio.gateway.name -}}
+{{- $gatewayExternalV1 := lookup "networking.istio.io/v1" "Gateway" $gatewayNamespace $gatewayName -}}
+{{- $gatewayExternalV1beta1 := lookup "networking.istio.io/v1beta1" "Gateway" $gatewayNamespace $gatewayName -}}
+{{- $gatewayExists := or $gatewayExternalV1 $gatewayExternalV1beta1 -}}
+{{- if not $gatewayExists -}}
+################################################
+# Standardized Templates - Istio Gateway
+################################################
+apiVersion: {{ ternary "networking.istio.io/v1" "networking.istio.io/v1beta1" (.Capabilities.APIVersions.Has "networking.istio.io/v1") }}
+kind: Gateway
+metadata:
+  name: {{ $gatewayName | quote }}
+  namespace: {{ $gatewayNamespace | quote }}
+{{- include "labels" . | indent 2 }}
+spec:
+  selector:
+{{ toYaml .Values.istio.gateway.selector | indent 4 }}
+  servers:
+    - port:
+        number: {{ .Values.istio.gateway.port }}
+        name: {{ printf "%s-%v" (.Values.istio.gateway.protocol | lower) .Values.istio.gateway.port | quote }}
+        protocol: {{ .Values.istio.gateway.protocol | quote }}
+      hosts:
+{{- range $hosts }}
+        - {{ tpl . $ | quote }}
+{{- end }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
