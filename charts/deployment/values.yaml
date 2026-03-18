@@ -111,6 +111,31 @@ ingress_secondary:
         - /
   tls: []
 
+# Istio VirtualService definitions
+istio:
+  virtualService:
+    enabled: false
+    # If we want to override the name, RECOMMEND YOU DO NOT DO THIS UNLESS YOU NEED, it has a sane default
+    name: ""
+    annotations: {}
+    # Hosts for the virtual service
+    hosts:
+      - chart-example.local
+    # Gateways list, for in-mesh traffic use ["mesh"]
+    gateways:
+      - mesh
+    # Optional full HTTP spec override. If empty, chart creates a default route
+    # http:
+    #   - match:
+    #       - uri:
+    #           prefix: /
+    #     route:
+    #       - destination:
+    #           host: my-service
+    #           port:
+    #             number: 80
+    http: []
+
 # Service definitions
 service:
   enabled: true

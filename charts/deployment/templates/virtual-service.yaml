@@ -1,0 +1,38 @@
+{{- if .Values.istio.virtualService.enabled -}}
+{{- $fullName := include "name" . -}}
+{{- $hosts := required "A valid Values.istio.virtualService.hosts is required!" .Values.istio.virtualService.hosts -}}
+################################################
+# Standardized Templates - Istio VirtualService
+################################################
+apiVersion: {{ ternary "networking.istio.io/v1" "networking.istio.io/v1beta1" (.Capabilities.APIVersions.Has "networking.istio.io/v1") }}
+kind: VirtualService
+metadata:
+  name: {{ if .Values.istio.virtualService.name }}{{ tpl .Values.istio.virtualService.name $ | quote }}{{ else }}{{ $fullName | quote }}{{ end }}
+{{- include "labels" . | indent 2 }}
+{{- with .Values.istio.virtualService.annotations }}
+  annotations:
+{{ tpl (toYaml .) $ | indent 4 }}
+{{- end }}
+spec:
+  hosts:
+{{- range $hosts }}
+    - {{ tpl . $ | quote }}
+{{- end }}
+  gateways:
+{{- range .Values.istio.virtualService.gateways }}
+    - {{ tpl . $ | quote }}
+{{- end }}
+  http:
+{{- if .Values.istio.virtualService.http }}
+{{ tpl (toYaml .Values.istio.virtualService.http) $ | indent 4 }}
+{{- else }}
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ $fullName }}
+            port:
+              number: {{ .Values.service.port }}
+{{- end }}
+{{- end }}
