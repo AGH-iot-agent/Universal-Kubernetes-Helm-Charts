@@ -21,7 +21,7 @@ metadata:
 {{- end }}
 
   # include labels for this service to identify it
-{{- include "labels" . | indent 2 }}
+{{ include "labels" . | indent 2 }}
 
 # Service definition
 spec:

@@ -8,7 +8,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: {{ template "name" . }}
   # include labels for this service to identify it
-{{- include "labels" . | indent 2 }}
+{{ include "labels" . | indent 2 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v2beta1

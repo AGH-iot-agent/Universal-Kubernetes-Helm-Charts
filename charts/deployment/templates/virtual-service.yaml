@@ -14,7 +14,7 @@ apiVersion: {{ ternary "networking.istio.io/v1" "networking.istio.io/v1beta1" (.
 kind: VirtualService
 metadata:
   name: {{ if .Values.istio.virtualService.name }}{{ tpl .Values.istio.virtualService.name $ | quote }}{{ else }}{{ $fullName | quote }}{{ end }}
-{{- include "labels" . | indent 2 }}
+{{ include "labels" . | indent 2 }}
 {{- with .Values.istio.virtualService.annotations }}
   annotations:
 {{ tpl (toYaml .) $ | indent 4 }}

@@ -15,7 +15,7 @@ kind: Gateway
 metadata:
   name: {{ $gatewayName | quote }}
   namespace: {{ $gatewayNamespace | quote }}
-{{- include "labels" . | indent 2 }}
+{{ include "labels" . | indent 2 }}
 spec:
   selector:
 {{ toYaml .Values.istio.gateway.selector | indent 4 }}

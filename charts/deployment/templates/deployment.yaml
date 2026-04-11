@@ -7,7 +7,7 @@ kind: Deployment
 
 metadata:
   name: {{ template "name" . }}
-{{- include "labels" . | indent 2 }}
+{{ include "labels" . | indent 2 }}
 
 # Deployment specification
 spec:
@@ -57,7 +57,7 @@ spec:
   # This is the podTemplate, the bread and butter
   template:
     metadata:
-{{- include "labels" . | indent 6 -}}
+{{ include "labels" . | indent 6 }}
 {{- if .Values.podAnnotations }}
       annotations:
 {{- range $k, $v := .Values.podAnnotations }}

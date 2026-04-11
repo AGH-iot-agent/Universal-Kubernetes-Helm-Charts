@@ -16,7 +16,7 @@ metadata:
   name: {{ template "ingress_secondary.name" . }}
   # SHOULD USE name: {{ template "name" . }}
   # include labels for this service to identify it.  This helper automatically generated the labels: so do not specify it here
-{{- include "labels" . | indent 2 }}
+{{ include "labels" . | indent 2 }}
   annotations:
 {{- if not .Values.ingress_secondary.ingressClassName }}
     kubernetes.io/ingress.class: {{ .Values.ingress_secondary.nginx_class | quote }}
